@@ -4,17 +4,20 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Paperclip, Sparkles, FileText, User, Loader2, MessageSquare } from "lucide-react";
+import { Send, Paperclip, Sparkles, FileText, User, Loader2, MessageSquare, Menu } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import type { Message } from "@/types/database";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface ChatAreaProps {
   selectedProjectId: string | null;
   messages: Message[];
   onSendMessage: (content: string) => Promise<void>;
+  onToggleMobileMenu?: () => void;
 }
 
-export function ChatArea({ selectedProjectId, messages, onSendMessage }: ChatAreaProps) {
+export function ChatArea({ selectedProjectId, messages, onSendMessage, onToggleMobileMenu }: ChatAreaProps) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -64,6 +67,19 @@ export function ChatArea({ selectedProjectId, messages, onSendMessage }: ChatAre
 
   return (
     <main className="flex-1 flex flex-col min-h-0 bg-background">
+      {/* Mobile Header with Hamburger */}
+      <div className="md:hidden flex items-center gap-3 p-4 border-b border-border bg-card">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onToggleMobileMenu}
+          className="shrink-0"
+        >
+          <Menu className="w-5 h-5" />
+        </Button>
+        <span className="font-semibold">Unravel</span>
+      </div>
+
       {/* Messages Area - Native Scroll */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         <div className="max-w-3xl mx-auto space-y-6">
@@ -105,14 +121,42 @@ export function ChatArea({ selectedProjectId, messages, onSendMessage }: ChatAre
                     </Avatar>
                     <div className="flex-1">
                       <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3">
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                          {message.content || (
-                            <span className="inline-flex items-center gap-2 text-muted-foreground">
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Thinking...
-                            </span>
-                          )}
-                        </p>
+                        {message.content ? (
+                          <div className="prose prose-sm prose-invert max-w-none text-foreground">
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              components={{
+                                // Style markdown elements
+                                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                                ul: ({ children }) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
+                                ol: ({ children }) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
+                                li: ({ children }) => <li className="mb-1">{children}</li>,
+                                h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
+                                h2: ({ children }) => <h2 className="text-base font-bold mb-2">{children}</h2>,
+                                h3: ({ children }) => <h3 className="text-sm font-bold mb-1">{children}</h3>,
+                                code: ({ className, children }) => {
+                                  const isInline = !className;
+                                  return isInline ? (
+                                    <code className="bg-background/50 px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>
+                                  ) : (
+                                    <code className="block bg-background/50 p-3 rounded-lg text-xs font-mono overflow-x-auto my-2">{children}</code>
+                                  );
+                                },
+                                pre: ({ children }) => <pre className="bg-background/50 p-3 rounded-lg overflow-x-auto my-2">{children}</pre>,
+                                a: ({ href, children }) => <a href={href} className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">{children}</a>,
+                                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                                blockquote: ({ children }) => <blockquote className="border-l-2 border-primary/50 pl-3 italic my-2">{children}</blockquote>,
+                              }}
+                            >
+                              {message.content}
+                            </ReactMarkdown>
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-2 text-muted-foreground text-sm">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Thinking...
+                          </span>
+                        )}
                       </div>
                       {/* Source citations */}
                       {Array.isArray(message.sources) && message.sources.length > 0 && (

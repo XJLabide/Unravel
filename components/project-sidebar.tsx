@@ -30,6 +30,7 @@ import {
   Loader2,
   LogOut,
   MessageSquare,
+  Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
@@ -46,6 +47,7 @@ interface ProjectSidebarProps {
   onDeleteProject: (id: string) => Promise<void>;
   isMobileMenuOpen: boolean;
   onToggleMobileMenu: () => void;
+  refreshTrigger?: number; // Increment to force refresh
 }
 
 export function ProjectSidebar({
@@ -57,6 +59,9 @@ export function ProjectSidebar({
   onDeleteConversation,
   onCreateProject,
   onDeleteProject,
+  refreshTrigger,
+  isMobileMenuOpen,
+  onToggleMobileMenu,
 }: ProjectSidebarProps) {
   const { user, signOut } = useAuth();
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
@@ -75,6 +80,17 @@ export function ProjectSidebar({
   const [deleteConvDialogOpen, setDeleteConvDialogOpen] = useState(false);
   const [conversationToDelete, setConversationToDelete] = useState<Conversation | null>(null);
 
+  // Project Rename
+  const [renameProjectDialogOpen, setRenameProjectDialogOpen] = useState(false);
+  const [projectToRename, setProjectToRename] = useState<Project | null>(null);
+  const [newProjectRename, setNewProjectRename] = useState("");
+  const [renaming, setRenaming] = useState(false);
+
+  // Conversation Rename
+  const [renameConvDialogOpen, setRenameConvDialogOpen] = useState(false);
+  const [conversationToRename, setConversationToRename] = useState<Conversation | null>(null);
+  const [newConvRename, setNewConvRename] = useState("");
+
   const [deleting, setDeleting] = useState(false);
 
   // Auto-expand selected project
@@ -84,6 +100,15 @@ export function ProjectSidebar({
       setExpandedProjects(prev => new Set(prev).add(selectedProjectId));
     }
   }, [selectedProjectId]);
+
+  // Refresh conversations when refreshTrigger changes
+  useEffect(() => {
+    if (refreshTrigger && selectedProjectId) {
+      // Force refresh by clearing the loading state
+      setLoadingConversations(prev => ({ ...prev, [selectedProjectId]: false }));
+      fetchConversations(selectedProjectId);
+    }
+  }, [refreshTrigger]);
 
   const fetchConversations = async (projectId: string) => {
     if (loadingConversations[projectId]) return;
@@ -169,9 +194,82 @@ export function ProjectSidebar({
     }
   };
 
+  // Rename project handler
+  const handleRenameProject = async () => {
+    if (!projectToRename || !newProjectRename.trim()) return;
+    setRenaming(true);
+
+    try {
+      const res = await fetch(`/api/projects/${projectToRename.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newProjectRename.trim() }),
+      });
+
+      if (res.ok) {
+        // Refresh will happen via parent component
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error("Failed to rename project:", error);
+    } finally {
+      setRenaming(false);
+      setProjectToRename(null);
+      setNewProjectRename("");
+      setRenameProjectDialogOpen(false);
+    }
+  };
+
+  // Rename conversation handler
+  const handleRenameConversation = async () => {
+    if (!conversationToRename || !newConvRename.trim()) return;
+    setRenaming(true);
+
+    try {
+      const res = await fetch(`/api/conversations/${conversationToRename.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: newConvRename.trim() }),
+      });
+
+      if (res.ok) {
+        // Update local state
+        const projectId = conversationToRename.project_id;
+        setProjectConversations(prev => ({
+          ...prev,
+          [projectId]: prev[projectId]?.map(c =>
+            c.id === conversationToRename.id
+              ? { ...c, title: newConvRename.trim() }
+              : c
+          ) || []
+        }));
+      }
+    } catch (error) {
+      console.error("Failed to rename conversation:", error);
+    } finally {
+      setRenaming(false);
+      setConversationToRename(null);
+      setNewConvRename("");
+      setRenameConvDialogOpen(false);
+    }
+  };
+
   return (
     <>
-      <aside className="w-72 shrink-0 bg-card border-r border-border flex flex-col sticky">
+      {/* Mobile Overlay */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={onToggleMobileMenu}
+        />
+      )}
+
+      <aside className={cn(
+        "w-72 shrink-0 bg-card border-r border-border flex flex-col sticky z-50",
+        // Mobile: fixed overlay, hidden by default
+        "fixed inset-y-0 left-0 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0",
+        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+      )}>
         {/* Header */}
         <div className="p-4 border-b border-border">
           <div className="flex items-center gap-2 mb-4">
@@ -221,7 +319,7 @@ export function ProjectSidebar({
                       <FolderOpen className="w-4 h-4 flex-shrink-0" />
                       <span className="flex-1 text-left truncate">{project.name}</span>
                       <span className="text-xs text-muted-foreground">
-                        {project.document_count}
+                        {projectConversations[project.id]?.length || 0}
                       </span>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -235,6 +333,17 @@ export function ProjectSidebar({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setProjectToRename(project);
+                              setNewProjectRename(project.name);
+                              setRenameProjectDialogOpen(true);
+                            }}
+                          >
+                            <Pencil className="w-4 h-4 mr-2" />
+                            Rename
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive"
                             onClick={(e) => {
@@ -252,7 +361,7 @@ export function ProjectSidebar({
 
                     {/* Conversations List */}
                     {expandedProjects.has(project.id) && (
-                      <div className="ml-6 border-l border-border pl-2 mt-1 space-y-0.5">
+                      <div className="ml-4 border-l border-border pl-2 mt-1 space-y-0.5 pr-1">
                         {/* New Chat Button */}
                         <div
                           className={cn(
@@ -280,7 +389,7 @@ export function ProjectSidebar({
                           <div
                             key={conv.id}
                             className={cn(
-                              "flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors cursor-pointer group/conv",
+                              "flex items-center gap-1 px-2 py-1.5 rounded-md text-sm transition-colors cursor-pointer group/conv",
                               selectedConversationId === conv.id
                                 ? "bg-muted font-medium text-foreground"
                                 : "hover:bg-muted/50 text-muted-foreground"
@@ -288,20 +397,36 @@ export function ProjectSidebar({
                             onClick={() => onSelectConversation(conv.id, project.id)}
                           >
                             <MessageSquare className="w-3 h-3 flex-shrink-0" />
-                            <span className="truncate flex-1">{conv.title || "New Conversation"}</span>
-
+                            {/* Title wrapper - this div grows to fill space and clips overflow */}
+                            <div className="flex-1 overflow-hidden">
+                              <span className="block truncate text-sm">
+                                {conv.title || "New Conversation"}
+                              </span>
+                            </div>
+                            {/* Button - always at fixed position on right */}
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-5 w-5 opacity-0 group-hover/conv:opacity-100"
+                                  className="h-6 w-6 flex-shrink-0 opacity-70 hover:opacity-100"
                                   onClick={(e) => e.stopPropagation()}
                                 >
-                                  <MoreHorizontal className="w-3 h-3" />
+                                  <MoreHorizontal className="w-4 h-4" />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setConversationToRename(conv);
+                                    setNewConvRename(conv.title || "");
+                                    setRenameConvDialogOpen(true);
+                                  }}
+                                >
+                                  <Pencil className="w-4 h-4 mr-2" />
+                                  Rename
+                                </DropdownMenuItem>
                                 <DropdownMenuItem
                                   className="text-destructive"
                                   onClick={(e) => {
@@ -417,6 +542,60 @@ export function ProjectSidebar({
             <Button variant="destructive" onClick={handleDeleteConversation} disabled={deleting}>
               {deleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Project Dialog */}
+      <Dialog open={renameProjectDialogOpen} onOpenChange={setRenameProjectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Project</DialogTitle>
+            <DialogDescription>
+              Enter a new name for this project.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={newProjectRename}
+            onChange={(e) => setNewProjectRename(e.target.value)}
+            placeholder="Project name"
+            onKeyDown={(e) => e.key === "Enter" && handleRenameProject()}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameProjectDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleRenameProject} disabled={renaming || !newProjectRename.trim()}>
+              {renaming && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Rename
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Conversation Dialog */}
+      <Dialog open={renameConvDialogOpen} onOpenChange={setRenameConvDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Conversation</DialogTitle>
+            <DialogDescription>
+              Enter a new name for this conversation.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={newConvRename}
+            onChange={(e) => setNewConvRename(e.target.value)}
+            placeholder="Conversation name"
+            onKeyDown={(e) => e.key === "Enter" && handleRenameConversation()}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameConvDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleRenameConversation} disabled={renaming || !newConvRename.trim()}>
+              {renaming && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Rename
             </Button>
           </DialogFooter>
         </DialogContent>
