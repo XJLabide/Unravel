@@ -6,7 +6,6 @@ import {
     uploadFileApiV1FilesPost,
     addFilesToPipelineApiApiV1PipelinesPipelineIdFilesPut,
 } from "llama-cloud-services/api";
-import { Document } from "@llamaindex/core/schema";
 
 // Environment configuration
 const LLAMA_CLOUD_API_KEY = process.env.LLAMA_CLOUD_API_KEY!;
@@ -93,16 +92,21 @@ export async function parseAndIndexDocument(
         const pipelineId = await index.getPipelineId();
         const projectIdFromIndex = await index.getProjectId();
 
-        // Convert Buffer to Blob if needed
-        let fileBlob: Blob;
+        // Convert Buffer/Blob to File with proper filename
+        // Using File instead of Blob ensures LlamaCloud receives the correct filename
+        let uploadFile: File;
+        const mimeType = getMimeType(fileName);
+
         if (file instanceof Buffer) {
             const uint8Array = new Uint8Array(file);
-            fileBlob = new Blob([uint8Array], { type: getMimeType(fileName) });
+            uploadFile = new File([uint8Array], fileName, { type: mimeType });
         } else if (file instanceof Blob) {
-            fileBlob = file;
+            // Convert Blob to File with proper name
+            const arrayBuffer = await file.arrayBuffer();
+            uploadFile = new File([arrayBuffer], fileName, { type: mimeType });
         } else {
             const uint8Array = new Uint8Array(file as unknown as ArrayBuffer);
-            fileBlob = new Blob([uint8Array], { type: getMimeType(fileName) });
+            uploadFile = new File([uint8Array], fileName, { type: mimeType });
         }
 
         // Step 1: Upload file to LlamaCloud file storage
@@ -110,7 +114,7 @@ export async function parseAndIndexDocument(
 
         const uploadResponse = await uploadFileApiV1FilesPost({
             body: {
-                upload_file: fileBlob as File,
+                upload_file: uploadFile,
             },
             query: {
                 project_id: projectIdFromIndex,
@@ -195,7 +199,9 @@ export async function queryIndex(
     topK: number = 5
 ): Promise<QueryResult[]> {
     try {
+        const indexName = getIndexName(projectId);
         console.log("[queryIndex] Starting query for project:", projectId);
+        console.log("[queryIndex] Using index name:", indexName);
 
         // Add timeout to prevent infinite hang
         const timeoutPromise = new Promise<never>((_, reject) => {
@@ -211,15 +217,34 @@ export async function queryIndex(
                 similarityTopK: topK,
             }) as LlamaCloudRetriever;
 
-            console.log("[queryIndex] Retrieving results...");
+            console.log("[queryIndex] Retrieving results for query:", query);
             const results = await retriever.retrieve({ query });
             console.log("[queryIndex] Got", results.length, "results");
 
-            return results.map((result) => ({
-                content: (result.node as Document).text || "",
-                score: result.score || 0,
-                metadata: result.node.metadata || {},
-            }));
+            if (results.length === 0) {
+                console.log("[queryIndex] WARNING: No results returned. Index may be empty or documents not processed yet.");
+            }
+
+            return results.map((result) => {
+                const nodeMetadata = result.node.metadata || {};
+                // Build robust metadata with fallback chain for file_name
+                const enhancedMetadata: Record<string, unknown> = {
+                    ...nodeMetadata,
+                    // Fallback chain: custom_metadata.file_name > file_name > source node > default
+                    file_name:
+                        (nodeMetadata.custom_metadata as Record<string, unknown>)?.file_name ||
+                        nodeMetadata.file_name ||
+                        (result.node as any).sourceNode?.metadata?.file_name ||
+                        nodeMetadata['file name'] ||
+                        "Unknown Document",
+                };
+
+                return {
+                    content: (result.node as any).text || (result.node as any).content || "",
+                    score: result.score || 0,
+                    metadata: enhancedMetadata,
+                };
+            });
         })();
 
         return await Promise.race([queryPromise, timeoutPromise]);
@@ -238,11 +263,9 @@ export async function deleteDocument(
 ): Promise<void> {
     try {
         const index = await getOrCreateIndex(projectId);
-        const doc = new Document({
-            id_: documentId,
-            text: "", // Empty text, only ID matters for deletion
-        });
-        await index.delete(doc);
+        // Use the index's delete method with the document ID
+        // Note: LlamaCloud may require different deletion approach
+        await (index as any).deleteRefDoc(documentId, true);
     } catch (error) {
         console.error("LlamaCloud delete error:", error);
         throw new Error(`Failed to delete document: ${error instanceof Error ? error.message : "Unknown error"}`);

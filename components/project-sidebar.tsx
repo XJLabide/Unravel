@@ -171,7 +171,7 @@ export function ProjectSidebar({
 
   return (
     <>
-      <aside className="w-72 bg-card border-r border-border flex flex-col">
+      <aside className="w-72 shrink-0 bg-card border-r border-border flex flex-col sticky">
         {/* Header */}
         <div className="p-4 border-b border-border">
           <div className="flex items-center gap-2 mb-4">
