@@ -20,6 +20,7 @@ export function ChatInterface() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [sidebarRefreshTrigger, setSidebarRefreshTrigger] = useState(0);
 
   // Fetch projects
   const fetchProjects = useCallback(async () => {
@@ -199,7 +200,19 @@ export function ChatInterface() {
       sources: [],
       created_at: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, tempUserMsg]);
+
+    // Add thinking message immediately
+    const thinkingMsgId = crypto.randomUUID();
+    const thinkingMsg: Message = {
+      id: thinkingMsgId,
+      conversation_id: conversationId || "",
+      role: "assistant",
+      content: "", // Empty content triggers "Thinking..." in UI
+      sources: [],
+      created_at: new Date().toISOString(),
+    };
+
+    setMessages((prev) => [...prev, tempUserMsg, thinkingMsg]);
 
     try {
       const res = await fetch("/api/chat", {
@@ -217,15 +230,15 @@ export function ChatInterface() {
         const errorData = await res.json().catch(() => ({ error: "Unknown error" }));
         const errorMessage = errorData.error || `Request failed with status ${res.status}`;
 
-        const errorMsg: Message = {
-          id: crypto.randomUUID(),
-          conversation_id: conversationId || "",
-          role: "assistant",
-          content: `⚠️ Error: ${errorMessage}`,
-          sources: [],
-          created_at: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, errorMsg]);
+        // Replace thinking message with error
+        setMessages((prev) => {
+          const updated = [...prev];
+          const lastMsg = updated[updated.length - 1];
+          if (lastMsg.id === thinkingMsgId) {
+            lastMsg.content = `⚠️ Error: ${errorMessage}`;
+          }
+          return updated;
+        });
         return;
       }
 
@@ -233,22 +246,14 @@ export function ChatInterface() {
       const newConvId = res.headers.get("X-Conversation-Id");
       if (newConvId && !conversationId) {
         setConversationId(newConvId);
+        // Trigger a refresh of the sidebar to show new conversation
+        setSidebarRefreshTrigger(prev => prev + 1);
       }
 
       // Stream response
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
       let assistantContent = "";
-
-      const tempAssistantMsg: Message = {
-        id: crypto.randomUUID(),
-        conversation_id: newConvId || conversationId || "",
-        role: "assistant",
-        content: "",
-        sources: [],
-        created_at: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, tempAssistantMsg]);
 
       console.log("[Frontend] Starting to read stream...");
 
@@ -326,6 +331,7 @@ export function ChatInterface() {
         onDeleteProject={handleDeleteProject}
         isMobileMenuOpen={isMobileMenuOpen}
         onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        refreshTrigger={sidebarRefreshTrigger}
       />
 
       {/* Main Chat Area */}
@@ -333,6 +339,7 @@ export function ChatInterface() {
         selectedProjectId={selectedProjectId}
         messages={messages}
         onSendMessage={handleSendMessage}
+        onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
       />
 
       {/* Right Sidebar - Documents */}
