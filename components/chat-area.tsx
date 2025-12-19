@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Paperclip, Sparkles, FileText, User, Loader2, MessageSquare, Menu } from "lucide-react";
+import { Send, Sparkles, FileText, User, Loader2, MessageSquare, Menu } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import type { Message } from "@/types/database";
 import ReactMarkdown from "react-markdown";
@@ -199,9 +199,6 @@ export function ChatArea({ selectedProjectId, messages, onSendMessage, onToggleM
               disabled={sending}
             />
             <div className="absolute right-2 bottom-2 flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="h-8 w-8" disabled>
-                <Paperclip className="w-4 h-4" />
-              </Button>
               <Button
                 size="icon"
                 className="h-8 w-8 bg-primary hover:bg-primary/90"
