@@ -212,53 +212,78 @@ export function ChatInterface() {
         }),
       });
 
-      if (res.ok) {
-        // Get conversation ID from header
-        const newConvId = res.headers.get("X-Conversation-Id");
-        if (newConvId && !conversationId) {
-          setConversationId(newConvId);
-        }
+      if (!res.ok) {
+        // Handle API error - show error message to user
+        const errorData = await res.json().catch(() => ({ error: "Unknown error" }));
+        const errorMessage = errorData.error || `Request failed with status ${res.status}`;
 
-        // Stream response
-        const reader = res.body?.getReader();
-        const decoder = new TextDecoder();
-        let assistantContent = "";
-
-        const tempAssistantMsg: Message = {
+        const errorMsg: Message = {
           id: crypto.randomUUID(),
-          conversation_id: newConvId || conversationId || "",
+          conversation_id: conversationId || "",
           role: "assistant",
-          content: "",
+          content: `⚠️ Error: ${errorMessage}`,
           sources: [],
           created_at: new Date().toISOString(),
         };
-        setMessages((prev) => [...prev, tempAssistantMsg]);
+        setMessages((prev) => [...prev, errorMsg]);
+        return;
+      }
 
-        console.log("[Frontend] Starting to read stream...");
+      // Get conversation ID from header
+      const newConvId = res.headers.get("X-Conversation-Id");
+      if (newConvId && !conversationId) {
+        setConversationId(newConvId);
+      }
 
-        while (reader) {
-          const { done, value } = await reader.read();
-          if (done) {
-            console.log("[Frontend] Stream done, final content:", assistantContent);
-            break;
-          }
+      // Stream response
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      let assistantContent = "";
 
-          const chunk = decoder.decode(value, { stream: true });
-          console.log("[Frontend] Raw chunk received:", chunk);
+      const tempAssistantMsg: Message = {
+        id: crypto.randomUUID(),
+        conversation_id: newConvId || conversationId || "",
+        role: "assistant",
+        content: "",
+        sources: [],
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, tempAssistantMsg]);
 
-          assistantContent += chunk;
-          setMessages((prev) => {
-            const updated = [...prev];
-            const lastMsg = updated[updated.length - 1];
-            if (lastMsg.role === "assistant") {
-              lastMsg.content = assistantContent;
-            }
-            return updated;
-          });
+      console.log("[Frontend] Starting to read stream...");
+
+      while (reader) {
+        const { done, value } = await reader.read();
+        if (done) {
+          console.log("[Frontend] Stream done, final content:", assistantContent);
+          break;
         }
+
+        const chunk = decoder.decode(value, { stream: true });
+        console.log("[Frontend] Raw chunk received:", chunk);
+
+        assistantContent += chunk;
+        setMessages((prev) => {
+          const updated = [...prev];
+          const lastMsg = updated[updated.length - 1];
+          if (lastMsg.role === "assistant") {
+            lastMsg.content = assistantContent;
+          }
+          return updated;
+        });
       }
     } catch (error) {
       console.error("Failed to send message:", error);
+      // Show error message to user
+      const errorMsg: Message = {
+        id: crypto.randomUUID(),
+        conversation_id: conversationId || "",
+        role: "assistant",
+        content: `⚠️ Error: ${error instanceof Error ? error.message : "Failed to send message. Please try again."}`,
+        sources: [],
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
     }
   };
 

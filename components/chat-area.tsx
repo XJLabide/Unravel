@@ -17,15 +17,8 @@ interface ChatAreaProps {
 export function ChatArea({ selectedProjectId, messages, onSendMessage }: ChatAreaProps) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
 
   const handleSend = async () => {
     if (!input.trim() || sending || !selectedProjectId) return;
@@ -33,6 +26,11 @@ export function ChatArea({ selectedProjectId, messages, onSendMessage }: ChatAre
     const message = input.trim();
     setInput("");
     setSending(true);
+
+    // Scroll to bottom when sending
+    setTimeout(() => {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
 
     try {
       await onSendMessage(message);
@@ -65,9 +63,9 @@ export function ChatArea({ selectedProjectId, messages, onSendMessage }: ChatAre
   }
 
   return (
-    <main className="flex-1 flex flex-col bg-background">
-      {/* Messages Area */}
-      <ScrollArea className="flex-1 p-6" ref={scrollRef}>
+    <main className="flex-1 flex flex-col min-h-0 bg-background">
+      {/* Messages Area - Native Scroll */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
         <div className="max-w-3xl mx-auto space-y-6">
           {messages.length === 0 ? (
             <div className="text-center py-12">
@@ -138,8 +136,10 @@ export function ChatArea({ selectedProjectId, messages, onSendMessage }: ChatAre
               </div>
             ))
           )}
+          {/* Scroll Anchor */}
+          <div ref={bottomRef} className="h-4 w-full" />
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Input Area */}
       <div className="border-t border-border bg-card">

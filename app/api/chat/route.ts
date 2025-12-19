@@ -100,7 +100,7 @@ export async function POST(request: Request) {
         let context: { content: string; metadata?: Record<string, unknown> }[] = [];
         try {
             console.log("[Chat] Querying LlamaCloud index for project:", projectId);
-            const results = await queryIndex(message, projectId, 5);
+            const results = await queryIndex(message, projectId, 10);
             console.log("[Chat] Got results from LlamaCloud:", results.length, "chunks");
             context = results.map((r) => ({
                 content: r.content,

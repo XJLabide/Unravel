@@ -74,7 +74,7 @@ export function DocumentSidebar({
   };
 
   return (
-    <aside className="w-80 bg-card border-l border-border flex flex-col">
+    <aside className="w-80 shrink-0 bg-card border-l border-border flex flex-col sticky">
       {/* Header */}
       <div className="p-4 border-b border-border">
         <h2 className="font-semibold mb-1">Documents</h2>
