@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -23,7 +24,7 @@ import {
   ChevronDown,
   FolderOpen,
   Plus,
-  Settings,
+  FileText,
   Layers,
   MoreHorizontal,
   Trash2,
@@ -458,10 +459,12 @@ export function ProjectSidebar({
               {user.email}
             </p>
           )}
-          <Button variant="ghost" size="sm" className="w-full justify-start">
-            <Settings className="w-4 h-4 mr-2" />
-            Settings
-          </Button>
+          <Link href="/docs">
+            <Button variant="ghost" size="sm" className="w-full justify-start">
+              <FileText className="w-4 h-4 mr-2" />
+              Docs
+            </Button>
+          </Link>
           <Button
             variant="ghost"
             size="sm"
