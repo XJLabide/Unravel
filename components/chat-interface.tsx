@@ -19,6 +19,8 @@ export function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [sidebarRefreshTrigger, setSidebarRefreshTrigger] = useState(0);
 
@@ -46,6 +48,7 @@ export function ChatInterface() {
       setDocuments([]);
       return;
     }
+    setLoadingDocuments(true);
     try {
       const res = await fetch(`/api/projects/${selectedProjectId}/documents`);
       if (res.ok) {
@@ -54,6 +57,8 @@ export function ChatInterface() {
       }
     } catch (error) {
       console.error("Failed to fetch documents:", error);
+    } finally {
+      setLoadingDocuments(false);
     }
   }, [selectedProjectId]);
 
@@ -63,6 +68,7 @@ export function ChatInterface() {
       setMessages([]);
       return;
     }
+    setLoadingMessages(true);
     try {
       const res = await fetch(`/api/conversations/${conversationId}`);
       if (res.ok) {
@@ -71,6 +77,8 @@ export function ChatInterface() {
       }
     } catch (error) {
       console.error("Failed to fetch messages:", error);
+    } finally {
+      setLoadingMessages(false);
     }
   }, [conversationId]);
 
@@ -300,6 +308,20 @@ export function ChatInterface() {
     }
   };
 
+  // Handle document deletion
+  const handleDeleteDocument = async (documentId: string) => {
+    try {
+      const res = await fetch(`/api/documents/${documentId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setDocuments(documents.filter((d) => d.id !== documentId));
+      }
+    } catch (error) {
+      console.error("Failed to delete document:", error);
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -340,6 +362,7 @@ export function ChatInterface() {
         messages={messages}
         onSendMessage={handleSendMessage}
         onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        isLoadingMessages={loadingMessages}
       />
 
       {/* Right Sidebar - Documents */}
@@ -348,6 +371,8 @@ export function ChatInterface() {
         documents={documents}
         onUploadDocument={handleUploadDocument}
         onRefreshDocuments={fetchDocuments}
+        onDeleteDocument={handleDeleteDocument}
+        isLoadingDocuments={loadingDocuments}
       />
     </div>
   );

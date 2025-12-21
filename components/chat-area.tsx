@@ -15,9 +15,10 @@ interface ChatAreaProps {
   messages: Message[];
   onSendMessage: (content: string) => Promise<void>;
   onToggleMobileMenu?: () => void;
+  isLoadingMessages?: boolean;
 }
 
-export function ChatArea({ selectedProjectId, messages, onSendMessage, onToggleMobileMenu }: ChatAreaProps) {
+export function ChatArea({ selectedProjectId, messages, onSendMessage, onToggleMobileMenu, isLoadingMessages }: ChatAreaProps) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -83,7 +84,12 @@ export function ChatArea({ selectedProjectId, messages, onSendMessage, onToggleM
       {/* Messages Area - Native Scroll */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         <div className="max-w-3xl mx-auto space-y-6">
-          {messages.length === 0 ? (
+          {isLoadingMessages ? (
+            <div className="text-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+              <p className="text-muted-foreground text-sm">Loading conversation...</p>
+            </div>
+          ) : messages.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary/10 flex items-center justify-center">
                 <Sparkles className="w-8 h-8 text-primary" />

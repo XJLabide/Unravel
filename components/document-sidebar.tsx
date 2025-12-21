@@ -4,15 +4,25 @@ import { useRef, useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
-import { Upload, FileText, Table, FileCode, CheckCircle2, Loader2, X, FileSpreadsheet } from "lucide-react";
+import { Upload, FileText, Table, FileCode, CheckCircle2, Loader2, X, Trash2 } from "lucide-react";
 import { cn, formatFileSize, getFileExtension, getFileIcon } from "@/lib/utils";
 import type { Document } from "@/types/database";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface DocumentSidebarProps {
   selectedProjectId: string | null;
   documents: Document[];
   onUploadDocument: (file: File) => Promise<Document | null>;
   onRefreshDocuments: () => void;
+  onDeleteDocument?: (documentId: string) => Promise<void>;
+  isLoadingDocuments?: boolean;
 }
 
 const iconMap = {
@@ -27,10 +37,15 @@ export function DocumentSidebar({
   selectedProjectId,
   documents,
   onUploadDocument,
+  onDeleteDocument,
+  isLoadingDocuments,
 }: DocumentSidebarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const readyCount = documents.filter((d) => d.status === "ready").length;
 
@@ -70,6 +85,18 @@ export function DocumentSidebar({
     if (e.target.files && e.target.files.length > 0) {
       handleFiles(e.target.files);
       e.target.value = ""; // Reset input
+    }
+  };
+
+  const handleDeleteDocument = async () => {
+    if (!documentToDelete || !onDeleteDocument) return;
+    setDeleting(true);
+    try {
+      await onDeleteDocument(documentToDelete.id);
+    } finally {
+      setDeleting(false);
+      setDocumentToDelete(null);
+      setDeleteDialogOpen(false);
     }
   };
 
@@ -134,6 +161,11 @@ export function DocumentSidebar({
             <p className="text-sm text-muted-foreground text-center py-4">
               Select a project to see documents
             </p>
+          ) : isLoadingDocuments ? (
+            <div className="text-center py-4">
+              <Loader2 className="w-5 h-5 animate-spin text-primary mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">Loading documents...</p>
+            </div>
           ) : documents.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">
               No documents yet. Upload some files to get started!
@@ -155,18 +187,34 @@ export function DocumentSidebar({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2 mb-1">
                         <p className="text-sm font-medium truncate">{doc.file_name}</p>
-                        {doc.status === "ready" && (
-                          <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                        )}
-                        {doc.status === "processing" && (
-                          <Loader2 className="w-4 h-4 text-primary animate-spin flex-shrink-0" />
-                        )}
-                        {doc.status === "uploading" && (
-                          <Loader2 className="w-4 h-4 text-muted-foreground animate-spin flex-shrink-0" />
-                        )}
-                        {doc.status === "error" && (
-                          <X className="w-4 h-4 text-destructive flex-shrink-0" />
-                        )}
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {doc.status === "ready" && (
+                            <CheckCircle2 className="w-4 h-4 text-green-500" />
+                          )}
+                          {doc.status === "processing" && (
+                            <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                          )}
+                          {doc.status === "uploading" && (
+                            <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
+                          )}
+                          {doc.status === "error" && (
+                            <X className="w-4 h-4 text-destructive" />
+                          )}
+                          {onDeleteDocument && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDocumentToDelete(doc);
+                                setDeleteDialogOpen(true);
+                              }}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {formatFileSize(doc.file_size)}
@@ -195,6 +243,26 @@ export function DocumentSidebar({
           Supported: PDF, DOCX, XLSX, CSV, TXT, MD, JSON
         </p>
       </div>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Document</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &quot;{documentToDelete?.file_name}&quot;? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteDocument} disabled={deleting}>
+              {deleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </aside>
   );
 }
