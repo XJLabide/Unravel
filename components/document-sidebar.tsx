@@ -118,7 +118,7 @@ export function DocumentSidebar({
           onChange={handleFileInputChange}
           className="hidden"
           multiple
-          accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,.txt,.md,.json"
+          accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,.txt,.md,.json,.ppt,.pptx"
         />
         <div
           className={cn(
@@ -240,7 +240,7 @@ export function DocumentSidebar({
       {/* Footer */}
       <div className="p-4 border-t border-border">
         <p className="text-xs text-muted-foreground text-center">
-          Supported: PDF, DOCX, XLSX, CSV, TXT, MD, JSON
+          Supported: PDF, DOCX, XLSX, CSV, TXT, MD, JSON, PPT
         </p>
       </div>
       {/* Delete Confirmation Dialog */}

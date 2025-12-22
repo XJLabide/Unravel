@@ -94,6 +94,15 @@ export function ProjectSidebar({
 
   const [deleting, setDeleting] = useState(false);
 
+  // Fetch conversation counts for all projects on load
+  useEffect(() => {
+    projects.forEach((project) => {
+      if (!projectConversations[project.id] && !loadingConversations[project.id]) {
+        fetchConversations(project.id);
+      }
+    });
+  }, [projects]);
+
   // Auto-expand selected project
   useEffect(() => {
     if (selectedProjectId && !expandedProjects.has(selectedProjectId)) {

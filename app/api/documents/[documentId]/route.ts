@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { deleteDocument as deleteLlamaDocument } from "@/lib/llama/client";
 
 export async function DELETE(
     request: Request,
@@ -56,8 +57,20 @@ export async function DELETE(
             throw new Error(deleteError.message);
         }
 
+        // Delete from LlamaCloud index
+        const projectId = document.project_id as string;
+        const llamaFileId = document.llama_file_id as string | null;
+        if (llamaFileId) {
+            try {
+                await deleteLlamaDocument(llamaFileId, projectId);
+                console.log("Deleted document from LlamaCloud index:", llamaFileId);
+            } catch (llamaError) {
+                console.error("Failed to delete from LlamaCloud (continuing anyway):", llamaError);
+                // Continue - DB record is already deleted
+            }
+        }
+
         // Decrement document count (optional - may fail if RPC doesn't exist)
-        const projectId = document.project_id;
         try {
             await supabase.rpc("decrement_document_count" as never, { project_id: projectId } as never);
         } catch {

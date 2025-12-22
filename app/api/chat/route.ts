@@ -139,12 +139,20 @@ export async function POST(request: Request) {
                         controller.enqueue(encoder.encode(chunk));
                     }
 
-                    // Save assistant message after stream completes
+                    // Build sources from context
                     const sources = context.map((c) => ({
                         fileName: String(c.metadata?.file_name || "Unknown"),
                         content: c.content.substring(0, 200),
                     }));
 
+                    // Send sources as special marker at end of stream
+                    // Format: \n\n__SOURCES__:JSON
+                    if (sources.length > 0) {
+                        const sourcesMarker = `\n\n__SOURCES__:${JSON.stringify(sources)}`;
+                        controller.enqueue(encoder.encode(sourcesMarker));
+                    }
+
+                    // Save assistant message after stream completes
                     await supabase.from("messages").insert({
                         conversation_id: convId,
                         role: "assistant",
