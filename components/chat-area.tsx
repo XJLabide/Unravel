@@ -125,7 +125,8 @@ export function ChatArea({ selectedProjectId, messages, onSendMessage, onToggleM
                         <Sparkles className="w-4 h-4 text-primary" />
                       </AvatarFallback>
                     </Avatar>
-                    <div className="flex-1">
+                    <div className="flex-1 space-y-2">
+                      {/* Message Bubble */}
                       <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3">
                         {message.content ? (
                           <div className="prose prose-sm prose-invert max-w-none text-foreground">
@@ -164,22 +165,27 @@ export function ChatArea({ selectedProjectId, messages, onSendMessage, onToggleM
                           </span>
                         )}
                       </div>
-                      {/* Source citations */}
-                      {Array.isArray(message.sources) && message.sources.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {(message.sources as { fileName: string; content?: string }[]).map(
-                            (source, idx) => (
-                              <button
-                                key={idx}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-card border border-border rounded-lg text-xs hover:bg-muted transition-colors"
-                              >
-                                <FileText className="w-3 h-3 text-muted-foreground" />
-                                <span className="text-foreground">{source.fileName}</span>
-                              </button>
-                            )
-                          )}
-                        </div>
-                      )}
+                      {/* Source Citations - Separate Container */}
+                      {Array.isArray(message.sources) &&
+                        message.sources.length > 0 &&
+                        (message.sources as { fileName: string }[]).some(s => s?.fileName) && (
+                          <div className="bg-card/50 border border-border rounded-xl px-3 py-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs text-muted-foreground">Sources:</span>
+                              {(message.sources as { fileName: string; content?: string }[])
+                                .filter(source => source?.fileName)
+                                .map((source, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="inline-flex items-center gap-1.5 px-2 py-1 bg-muted rounded-md text-xs text-foreground"
+                                  >
+                                    <FileText className="w-3 h-3 text-muted-foreground" />
+                                    {source.fileName}
+                                  </span>
+                                ))}
+                            </div>
+                          </div>
+                        )}
                     </div>
                   </>
                 )}
