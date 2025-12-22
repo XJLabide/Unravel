@@ -37,7 +37,13 @@ export async function GET(
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(messages);
+    // Parse sources JSON string to array
+    const parsedMessages = messages?.map(msg => ({
+        ...msg,
+        sources: typeof msg.sources === 'string' ? JSON.parse(msg.sources) : msg.sources || []
+    })) || [];
+
+    return NextResponse.json(parsedMessages);
 }
 
 export async function PATCH(

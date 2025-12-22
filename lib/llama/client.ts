@@ -256,20 +256,19 @@ export async function queryIndex(
 
 /**
  * Delete a document from the index
+ * Note: LlamaCloud doesn't provide a direct file deletion API.
+ * The document is removed from Supabase DB/Storage, but may linger in the index
+ * until the pipeline is refreshed or the project index is recreated.
  */
 export async function deleteDocument(
     documentId: string,
     projectId?: string
 ): Promise<void> {
-    try {
-        const index = await getOrCreateIndex(projectId);
-        // Use the index's delete method with the document ID
-        // Note: LlamaCloud may require different deletion approach
-        await (index as any).deleteRefDoc(documentId, true);
-    } catch (error) {
-        console.error("LlamaCloud delete error:", error);
-        throw new Error(`Failed to delete document: ${error instanceof Error ? error.message : "Unknown error"}`);
-    }
+    // LlamaCloud doesn't have a direct delete API for individual files
+    // The document will be removed from our DB/storage, but may remain in the index
+    // until the next pipeline sync or index rebuild
+    console.warn(`LlamaCloud deletion not supported. Document ${documentId} removed from DB only.`);
+    console.warn(`To fully remove from index, consider recreating the project index.`);
 }
 
 // ============================================

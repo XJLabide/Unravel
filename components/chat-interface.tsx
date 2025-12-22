@@ -126,13 +126,19 @@ export function ChatInterface() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
+
       if (res.ok) {
         const newProject = await res.json();
         setProjects([newProject, ...projects]);
         handleSelectProject(newProject.id);
+      } else {
+        const errorData = await res.json().catch(() => ({ error: "Unknown error" }));
+        console.error("Failed to create project:", res.status, errorData);
+        alert(`Failed to create project: ${errorData.error || res.statusText}`);
       }
     } catch (error) {
       console.error("Failed to create project:", error);
+      alert(`Failed to create project: ${error instanceof Error ? error.message : "Network error"}`);
     }
   };
 
@@ -262,6 +268,7 @@ export function ChatInterface() {
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
       let assistantContent = "";
+      let parsedSources: { fileName: string; content?: string }[] = [];
 
       console.log("[Frontend] Starting to read stream...");
 
@@ -276,11 +283,31 @@ export function ChatInterface() {
         console.log("[Frontend] Raw chunk received:", chunk);
 
         assistantContent += chunk;
+
+        // Check for sources marker at the end
+        let displayContent = assistantContent;
+        const sourcesMarker = "\n\n__SOURCES__:";
+        const sourcesIndex = assistantContent.indexOf(sourcesMarker);
+
+        if (sourcesIndex !== -1) {
+          displayContent = assistantContent.substring(0, sourcesIndex);
+          const sourcesJson = assistantContent.substring(sourcesIndex + sourcesMarker.length);
+          try {
+            parsedSources = JSON.parse(sourcesJson);
+            console.log("[Frontend] Parsed sources:", parsedSources);
+          } catch {
+            // Still streaming sources JSON, wait for complete
+          }
+        }
+
         setMessages((prev) => {
           const updated = [...prev];
           const lastMsg = updated[updated.length - 1];
           if (lastMsg.role === "assistant") {
-            lastMsg.content = assistantContent;
+            lastMsg.content = displayContent;
+            if (parsedSources.length > 0) {
+              lastMsg.sources = parsedSources;
+            }
           }
           return updated;
         });
